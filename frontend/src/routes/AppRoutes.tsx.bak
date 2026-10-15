@@ -1,0 +1,139 @@
+﻿import { useState } from "react";
+import { Navigate, Route, Routes } from "react-router-dom";
+import type { AuthUser } from "../api";
+import LoginPage from "../pages/Login/LoginPage";
+import WelcomeIntro from "../components/WelcomeIntro";
+import RegisterPage from "../pages/Register/RegisterPage";
+import AdminDashboard from "../pages/Admin/AdminDashboard";
+import ProviderDashboard from "../pages/provider/ProviderDashboard";
+import ProviderBookings from "../pages/provider/ProviderBookings";
+import ProviderProfile from "../pages/provider/ProviderProfile";
+import MyServices from "../pages/provider/MyServices";
+import CustomerDashboard from "../pages/customer/CustomerDashboard";
+import ProviderLayout from "../components/provider/ProviderLayout";
+
+function AppRoutes() {
+  const [session, setSession] = useState<{
+    user: AuthUser;
+    token: string;
+  } | null>(null);
+
+  function handleLogout() {
+    setSession(null);
+  }
+
+  const isProvider = session?.user.role === "provider";
+
+  return (
+    <Routes>
+      <Route path="/register" element={<RegisterPage />} />
+
+      <Route
+        path="/login"
+        element={
+          session ? (
+            <Navigate
+              to={
+                session.user.role === "admin"
+                  ? "/admin"
+                  : session.user.role === "provider"
+                    ? "/provider"
+                    : "/customer"
+              }
+              replace
+            />
+          ) : (
+            <>
+              <WelcomeIntro />
+              <LoginPage onLogin={(user, token) => setSession({ user, token })} />
+            </>
+          )
+        }
+      />
+
+      <Route
+        path="/admin"
+        element={
+          session?.user.role === "admin" ? (
+            <AdminDashboard token={session.token} onLogout={handleLogout} />
+          ) : (
+            <Navigate to="/login" replace />
+          )
+        }
+      />
+
+      <Route
+        path="/provider"
+        element={
+          isProvider && session ? (
+            <ProviderLayout user={session.user} onLogout={handleLogout}>
+              <ProviderDashboard token={session.token} user={session.user} />
+            </ProviderLayout>
+          ) : (
+            <Navigate to="/login" replace />
+          )
+        }
+      />
+
+      <Route
+        path="/provider/bookings"
+        element={
+          isProvider && session ? (
+            <ProviderLayout user={session.user} onLogout={handleLogout}>
+              <ProviderBookings token={session.token} user={session.user} />
+            </ProviderLayout>
+          ) : (
+            <Navigate to="/login" replace />
+          )
+        }
+      />
+
+      <Route
+        path="/provider/services"
+        element={
+          isProvider && session ? (
+            <ProviderLayout user={session.user} onLogout={handleLogout}>
+              <MyServices token={session.token} />
+            </ProviderLayout>
+          ) : (
+            <Navigate to="/login" replace />
+          )
+        }
+      />
+
+      <Route
+        path="/provider/profile"
+        element={
+          isProvider && session ? (
+            <ProviderLayout user={session.user} onLogout={handleLogout}>
+              <ProviderProfile user={session.user} />
+            </ProviderLayout>
+          ) : (
+            <Navigate to="/login" replace />
+          )
+        }
+      />
+
+      <Route
+        path="/customer"
+        element={
+          session?.user.role === "customer" ? (
+            <CustomerDashboard
+              user={session.user}
+              token={session.token}
+              onLogout={handleLogout}
+            />
+          ) : (
+            <Navigate to="/login" replace />
+          )
+        }
+      />
+
+      <Route path="/" element={<Navigate to="/login" replace />} />
+      <Route path="*" element={<Navigate to="/login" replace />} />
+    </Routes>
+  );
+}
+
+export default AppRoutes;
+

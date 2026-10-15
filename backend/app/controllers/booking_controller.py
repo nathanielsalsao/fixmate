@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+﻿from datetime import datetime, timezone
 
 from bson import ObjectId
 from bson.errors import InvalidId
@@ -103,7 +103,7 @@ def create_booking():
             "address": address.strip(),
             "notes": notes.strip(),
             "status": "pending",
-            "provider_id": None,
+            "provider_id": service.get("provider_id"),
             "created_at": now,
             "updated_at": now
         }
@@ -558,3 +558,4 @@ def cancel_booking(booking_id):
             "success": False,
             "message": "Unable to cancel booking"
         }), 500
+

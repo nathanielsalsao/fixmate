@@ -1,0 +1,370 @@
+﻿import { useCallback, useEffect, useState } from "react";
+import { Link } from "react-router-dom";
+import { apiRequest } from "../../api";
+import type { AuthUser } from "../../api";
+
+type Props = { token: string; user: AuthUser };
+type Booking = Record<string, unknown>;
+
+function getBookings(result: unknown): Booking[] {
+  if (Array.isArray(result)) return result as Booking[];
+  if (!result || typeof result !== "object") return [];
+
+  const data = result as Record<string, unknown>;
+
+  for (const key of ["bookings", "data", "items"]) {
+    if (Array.isArray(data[key])) return data[key] as Booking[];
+  }
+
+  return [];
+}
+
+function getText(value: unknown, fallback = ""): string {
+  if (value === null || value === undefined || value === "") return fallback;
+  return String(value);
+}
+
+function getStatus(booking: Booking): string {
+  return getText(booking.status, "pending")
+    .toLowerCase()
+    .replaceAll("_", " ")
+    .trim();
+}
+
+function formatDate(value: unknown): string {
+  if (!value) return "Schedule not provided";
+
+  const date = new Date(String(value));
+
+  if (Number.isNaN(date.getTime())) return String(value);
+
+  return date.toLocaleString("en-PH", {
+    dateStyle: "medium",
+    timeStyle: "short",
+  });
+}
+
+function formatPrice(value: unknown): string {
+  const price = Number(value);
+
+  if (value === undefined || value === null || value === "" || !Number.isFinite(price)) {
+    return "Price not provided";
+  }
+
+  return price.toLocaleString("en-PH", {
+    style: "currency",
+    currency: "PHP",
+    maximumFractionDigits: 2,
+  });
+}
+
+function getWaitingTime(value: unknown, now: number): string {
+  if (!value) return "Waiting time unavailable";
+
+  const created = new Date(String(value)).getTime();
+
+  if (Number.isNaN(created)) return "Waiting time unavailable";
+
+  const minutes = Math.max(0, Math.floor((now - created) / 60000));
+
+  if (minutes < 1) return "Waiting less than a minute";
+
+  if (minutes < 60) {
+    return `Waiting ${minutes} minute${minutes === 1 ? "" : "s"}`;
+  }
+
+  const hours = Math.floor(minutes / 60);
+  const remainingMinutes = minutes % 60;
+
+  if (hours < 24) {
+    return `Waiting ${hours}h ${remainingMinutes}m`;
+  }
+
+  const days = Math.floor(hours / 24);
+  const remainingHours = hours % 24;
+
+  return `Waiting ${days}d ${remainingHours}h`;
+}
+
+function statusStyle(status: string): string {
+  switch (status) {
+    case "pending":
+      return "bg-amber-50 text-amber-800";
+    case "confirmed":
+    case "accepted":
+      return "bg-blue-50 text-blue-800";
+    case "in progress":
+      return "bg-violet-50 text-violet-800";
+    case "completed":
+      return "bg-emerald-50 text-emerald-800";
+    case "cancelled":
+    case "canceled":
+      return "bg-red-50 text-red-800";
+    default:
+      return "bg-stone-100 text-stone-700";
+  }
+}
+
+export default function ProviderDashboard({ token, user }: Props) {
+  const [bookings, setBookings] = useState<Booking[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState("");
+  const [lastUpdated, setLastUpdated] = useState<number | null>(null);
+  const [now, setNow] = useState(() => Date.now());
+
+  const loadBookings = useCallback(async (background = false) => {
+    if (background) {
+      setRefreshing(true);
+    } else {
+      setLoading(true);
+    }
+
+    setError("");
+
+    try {
+      const result = await apiRequest<unknown>("/bookings", {}, token);
+      setBookings(getBookings(result));
+      setLastUpdated(Date.now());
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unable to load bookings.");
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }, [token]);
+
+  useEffect(() => {
+    void loadBookings();
+
+    const refreshId = window.setInterval(() => {
+      void loadBookings(true);
+    }, 5000);
+
+    const clockId = window.setInterval(() => {
+      setNow(Date.now());
+    }, 60000);
+
+    return () => {
+      window.clearInterval(refreshId);
+      window.clearInterval(clockId);
+    };
+  }, [loadBookings]);
+
+  const count = (status: string) =>
+    bookings.filter((booking) => getStatus(booking) === status).length;
+
+  const activeJobs = bookings.filter((booking) =>
+    ["confirmed", "accepted", "in progress"].includes(getStatus(booking))
+  ).length;
+
+  const stats = [
+    { label: "Total Bookings", value: bookings.length, detail: "All assigned requests" },
+    { label: "Pending Requests", value: count("pending"), detail: "Awaiting your response" },
+    { label: "Active Jobs", value: activeJobs, detail: "Confirmed or in progress" },
+    { label: "Completed Jobs", value: count("completed"), detail: "Finished services" },
+    { label: "Cancelled", value: count("cancelled") + count("canceled"), detail: "Cancelled bookings" },
+  ];
+
+  const recentBookings = [...bookings]
+    .sort((a, b) => {
+      const dateA = new Date(getText(a.created_at, a.booking_date as string)).getTime();
+      const dateB = new Date(getText(b.created_at, b.booking_date as string)).getTime();
+
+      return (Number.isNaN(dateB) ? 0 : dateB) - (Number.isNaN(dateA) ? 0 : dateA);
+    })
+    .slice(0, 5);
+
+  return (
+    <main className="min-h-screen bg-[#f5f7f3] p-6 sm:p-10">
+      <header className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <p className="text-sm font-semibold tracking-wider text-emerald-800">
+            FIXMATE PROVIDER
+          </p>
+          <h1 className="mt-2 text-3xl font-bold text-stone-900">
+            Welcome, {user.name}
+          </h1>
+          <p className="mt-2 text-stone-500">
+            Here's an overview of your home service bookings.
+          </p>
+          <p className="mt-2 text-xs text-stone-400">
+            {lastUpdated
+              ? `Last updated: ${new Date(lastUpdated).toLocaleTimeString("en-PH")}`
+              : "Connecting to your bookings..."}
+            {refreshing ? " · Updating..." : " · Auto-refreshes every 5 seconds"}
+          </p>
+        </div>
+      </header>
+
+      <section className="mt-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+        {stats.map((stat) => (
+          <article
+            key={stat.label}
+            className="rounded-2xl border border-stone-200 bg-white p-6 shadow-sm"
+          >
+            <p className="text-sm font-medium text-stone-500">{stat.label}</p>
+            <p className="mt-3 text-3xl font-bold text-stone-900">
+              {loading ? "…" : stat.value}
+            </p>
+            <p className="mt-2 text-xs text-stone-400">{stat.detail}</p>
+          </article>
+        ))}
+      </section>
+
+      {error && (
+        <div role="alert" className="mt-6 rounded-xl border border-red-100 bg-red-50 p-4 text-red-700">
+          <p className="font-semibold">Couldn't refresh your bookings</p>
+          <p className="mt-1 text-sm">{error}</p>
+          <button
+            type="button"
+            onClick={() => void loadBookings()}
+            className="mt-3 rounded-lg bg-red-700 px-4 py-2 text-sm font-semibold text-white"
+          >
+            Try again
+          </button>
+        </div>
+      )}
+
+      <section className="mt-8 rounded-2xl border border-stone-200 bg-white p-6 shadow-sm">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h2 className="text-lg font-bold text-stone-900">Recent Bookings</h2>
+            <p className="mt-1 text-sm text-stone-500">
+              Your five most recent assigned requests.
+            </p>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-3">
+            <button
+              type="button"
+              onClick={() => void loadBookings(true)}
+              disabled={loading || refreshing}
+              className="rounded-lg border border-stone-200 px-3 py-2 text-sm font-semibold text-stone-700 disabled:opacity-50"
+            >
+              {refreshing ? "Refreshing..." : "Refresh"}
+            </button>
+            <Link
+              className="font-semibold text-emerald-800 hover:underline"
+              to="/provider/bookings"
+            >
+              View all
+            </Link>
+          </div>
+        </div>
+
+        {loading ? (
+          <p className="mt-5 text-stone-500">Loading your bookings...</p>
+        ) : recentBookings.length === 0 ? (
+          <div className="mt-5 rounded-xl border border-dashed border-stone-200 p-8 text-center">
+            <h3 className="font-semibold text-stone-800">No bookings yet</h3>
+            <p className="mt-2 text-sm text-stone-500">
+              When a customer books one of your services, the assigned booking will appear here.
+            </p>
+            <Link
+              to="/provider/services"
+              className="mt-4 inline-block rounded-lg bg-[#123d2b] px-4 py-2 text-sm font-semibold text-white"
+            >
+              Manage My Services
+            </Link>
+          </div>
+        ) : (
+          <div className="mt-5 space-y-4">
+            {recentBookings.map((booking, index) => {
+              const status = getStatus(booking);
+              const id = getText(booking.id, getText(booking._id, String(index)));
+              const createdAt = booking.created_at;
+
+              return (
+                <article
+                  key={id}
+                  className="rounded-xl border border-stone-100 p-4 transition hover:border-stone-300"
+                >
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <h3 className="font-bold text-stone-900">
+                        {getText(
+                          booking.service_name,
+                          getText(booking.serviceName, getText(booking.service, "Home service booking"))
+                        )}
+                      </h3>
+                      <p className="mt-1 text-sm text-stone-500">
+                        {getText(booking.category, "Home service")}
+                      </p>
+                    </div>
+
+                    <span className={`rounded-full px-3 py-1 text-xs font-semibold capitalize ${statusStyle(status)}`}>
+                      {status}
+                    </span>
+                  </div>
+
+                  <div className="mt-4 grid gap-3 text-sm sm:grid-cols-2">
+                    <div>
+                      <p className="text-xs font-medium uppercase tracking-wide text-stone-400">
+                        Appointment
+                      </p>
+                      <p className="mt-1 text-stone-700">
+                        {formatDate(booking.booking_date ?? booking.scheduled_date ?? booking.date)}
+                      </p>
+                    </div>
+
+                    <div>
+                      <p className="text-xs font-medium uppercase tracking-wide text-stone-400">
+                        Service price
+                      </p>
+                      <p className="mt-1 font-semibold text-stone-800">
+                        {formatPrice(booking.base_price ?? booking.price)}
+                      </p>
+                    </div>
+
+                    {status === "pending" && (
+                      <div>
+                        <p className="text-xs font-medium uppercase tracking-wide text-stone-400">
+                          Request age
+                        </p>
+                        <p className="mt-1 font-semibold text-amber-700">
+                          {getWaitingTime(createdAt, now)}
+                        </p>
+                      </div>
+                    )}
+
+                    <div>
+                      <p className="text-xs font-medium uppercase tracking-wide text-stone-400">
+                        Customer
+                      </p>
+                      <p className="mt-1 text-stone-700">
+                        {getText(booking.customer_name, getText(booking.customerName, "Customer details unavailable"))}
+                      </p>
+                    </div>
+                  </div>
+
+                  {booking.address && (
+                    <p className="mt-3 text-sm text-stone-500">
+                      <span className="font-medium text-stone-700">Address:</span>{" "}
+                      {String(booking.address)}
+                    </p>
+                  )}
+
+                  {getText(booking.notes) !== " && (
+                    <p className="mt-2 text-sm text-stone-500">
+                      <span className="font-medium text-stone-700">Notes:</span>{" "}
+                      {String(booking.notes)}
+                    </p>
+                  )}
+
+                  {createdAt && (
+                    <p className="mt-3 border-t border-stone-100 pt-3 text-xs text-stone-400">
+                      Request submitted: {formatDate(createdAt)}
+                    </p>
+                  )}
+                </article>
+              );
+            })}
+          </div>
+        )}
+      </section>
+    </main>
+  );
+}
+
+

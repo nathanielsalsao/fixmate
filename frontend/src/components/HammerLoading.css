@@ -1,0 +1,139 @@
+﻿.hammer-loading {
+  display: flex;
+  min-height: 220px;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.25rem;
+  padding: 1.5rem;
+  color: #242424;
+  font-family: inherit;
+  text-align: center;
+}
+
+.hammer-loading--screen {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  min-height: 100vh;
+  min-height: 100dvh;
+  background: #faf9f6;
+}
+
+.hammer-scene {
+  display: block;
+  width: min(240px, 75vw);
+  overflow: visible;
+}
+
+.hammer-tool {
+  transform-box: view-box;
+  transform-origin: 165px 105px;
+  animation: hammer-strike 1.05s ease-in-out infinite;
+}
+
+.hammer-nail {
+  transform-box: view-box;
+  transform-origin: 120px 115px;
+  animation: nail-drive 1.05s ease-in-out infinite;
+}
+
+.hammer-sparks {
+  opacity: 0;
+  transform-box: view-box;
+  transform-origin: 120px 95px;
+  animation: spark-impact 1.05s ease-out infinite;
+}
+
+.hammer-loading__brand {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.45rem;
+  margin-top: -0.25rem;
+}
+
+.hammer-loading__name {
+  font-size: 1.7rem;
+  line-height: 1.2;
+  font-weight: 800;
+  letter-spacing: -0.06em;
+}
+
+.hammer-loading__name span {
+  color: #b7793f;
+}
+
+.hammer-loading__message {
+  color: #77736e;
+  font-size: 0.875rem;
+}
+
+.hammer-loading__dots {
+  display: flex;
+  gap: 5px;
+  margin-top: 0.3rem;
+}
+
+.hammer-loading__dots i {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: #b7793f;
+  animation: loading-dot 1s ease-in-out infinite;
+}
+
+.hammer-loading__dots i:nth-child(2) {
+  animation-delay: 0.15s;
+}
+
+.hammer-loading__dots i:nth-child(3) {
+  animation-delay: 0.3s;
+}
+
+@keyframes hammer-strike {
+  0%, 12% { transform: rotate(-24deg); }
+  38% { transform: rotate(0deg) translateY(3px); }
+  45% { transform: rotate(2deg); }
+  58%, 100% { transform: rotate(-24deg); }
+}
+
+@keyframes nail-drive {
+  0%, 30%, 58%, 100% { transform: translateY(0); }
+  38%, 45% { transform: translateY(4px); }
+}
+
+@keyframes spark-impact {
+  0%, 31%, 53%, 100% {
+    opacity: 0;
+    transform: scale(0.5);
+  }
+  37% {
+    opacity: 1;
+    transform: scale(1.15);
+  }
+  46% {
+    opacity: 0.4;
+    transform: scale(1.3);
+  }
+}
+
+@keyframes loading-dot {
+  0%, 60%, 100% {
+    opacity: 0.3;
+    transform: translateY(0);
+  }
+  30% {
+    opacity: 1;
+    transform: translateY(-4px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hammer-tool,
+  .hammer-nail,
+  .hammer-sparks,
+  .hammer-loading__dots i {
+    animation: none;
+  }
+}

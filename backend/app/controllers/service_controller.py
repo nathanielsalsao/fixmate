@@ -24,6 +24,11 @@ def get_services():
             service_object = HomeService.from_document(document)
             service_data = service_object.to_dict()
             service_data["is_active"] = document.get("is_active", True)
+            service_data["provider_id"] = (
+                str(document["provider_id"])
+                if document.get("provider_id")
+                else None
+            )
             services.append(service_data)
 
         return jsonify({
@@ -222,6 +227,11 @@ def update_service(service_id):
         service_object = HomeService.from_document(document)
         service_data = service_object.to_dict()
         service_data["is_active"] = document.get("is_active", True)
+        service_data["provider_id"] = (
+            str(document["provider_id"])
+            if document.get("provider_id")
+            else None
+        )
 
         return jsonify({
             "success": True,
@@ -282,3 +292,6 @@ def deactivate_service(service_id):
             "success": False,
             "message": "Unable to deactivate service"
         }), 500
+
+
+
