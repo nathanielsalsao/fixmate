@@ -1,0 +1,15 @@
+CUSTOMER
+ ├── Register
+ ├── Login
+ ├── View Services
+ ├── Book Service
+ ├── View Booking
+ ├── Cancel Booking
+ └── Give Rating/Review
+
+ ADMIN
+ ├── Login
+ ├── Manage Users
+ ├── Manage Services
+ ├── Manage Bookings
+ └── View Reports
